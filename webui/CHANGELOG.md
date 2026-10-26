@@ -37,6 +37,7 @@ This change log covers only the frontend library (webui) of Open VSX.
 - Bump undici from 8.11.2 to 8.12.3 (#2362)
 - Remove `fetch-retry`; the query client owns retries
 - Bump dompurify from 3.4.16 to 3.4.17 (#2379)
+- Upgrade `yarn` from 4.9.1 to 4.18.1 and set `npmMinimalAgeGate` to 7 days, so versions published in the last 7 days are not picked for new resolutions (#2393)
 
 ## [1.3.0] - 2026-10-16
 
