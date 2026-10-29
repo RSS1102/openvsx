@@ -304,6 +304,28 @@ class ExtensionSoftDeleteTest extends AbstractPostgresContainerTest {
                 .isEqualTo("1.0.0");
     }
 
+    @Test
+    void publicLatestAndPreReleaseRespectActiveVersions() {
+        persistVersion("1.0.0", TargetPlatform.NAME_UNIVERSAL, true, false);
+        persistVersion("2.0.0", TargetPlatform.NAME_UNIVERSAL, true, false);
+        new TransactionTemplate(txManager).executeWithoutResult(status -> {
+            var preRelease = em.createQuery(
+                    "select ev from ExtensionVersion ev where ev.extension.id = :id and ev.version = :version",
+                    ExtensionVersion.class).setParameter("id", extensionId).setParameter("version", "2.0.0")
+                    .getSingleResult();
+            preRelease.setPreRelease(true);
+        });
+
+        assertThat(repositories.findExtensionVersion(NAMESPACE, EXTENSION, null, "latest").getVersion())
+                .isEqualTo("2.0.0");
+        assertThat(repositories.findExtensionVersion(NAMESPACE, EXTENSION, null, "pre-release").getVersion())
+                .isEqualTo("2.0.0");
+        setVersionActive("2.0.0", false);
+        assertThat(repositories.findExtensionVersion(NAMESPACE, EXTENSION, null, "latest").getVersion())
+                .isEqualTo("1.0.0");
+        assertThat(repositories.findExtensionVersion(NAMESPACE, EXTENSION, null, "pre-release")).isNull();
+    }
+
     private void setVersionActive(String version, boolean active) {
         new TransactionTemplate(txManager).executeWithoutResult(status -> {
             var found = em.createQuery(

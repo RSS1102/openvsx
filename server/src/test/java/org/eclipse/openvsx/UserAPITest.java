@@ -89,9 +89,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserAPI.class)
+@org.springframework.context.annotation.Import(PublishedLatestService.class)
 @MockitoBean(
     types = {
         DSLContext.class,
+        UpstreamRegistryService.class,
         RestTemplate.class,
         ClientRegistrationRepository.class,
         StorageUtilService.class,
@@ -143,6 +145,9 @@ class UserAPITest {
 
     @Autowired
     MockMvc mockMvc;
+
+    @Autowired
+    UpstreamRegistryService upstream;
     @Autowired
     private AccessTokenService accessTokenService;
 
@@ -633,6 +638,38 @@ class UserAPITest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publishedLatestVersion").doesNotExist())
                 .andExpect(jsonPath("$.allTargetPlatformVersions").isArray());
+    }
+
+    @Test
+    void testGetOwnExtensionUsesUpstreamLatestWhenLocalIsInactive() throws Exception {
+        var userData = mockUserData();
+        var historical = mockExtension(userData, 1, 0, 0).getFirst();
+        historical.setId(42L);
+        Mockito.when(repositories.isNamespaceOwner(any(UserData.class), any(Namespace.class))).thenReturn(true);
+        Mockito.when(repositories.findLatestVersion(eq("foobar"), eq("baz"), any(), eq(false), eq(false)))
+                .thenReturn(historical);
+        Mockito.when(repositories.findTargetPlatformsGroupedByVersion(historical.getExtension()))
+                .thenReturn(
+                        List.of(
+                                new VersionTargetPlatformsJson(
+                                        historical.getVersion(),
+                                        List.of(
+                                                new TargetPlatformActiveJson(
+                                                        TargetPlatform.NAME_UNIVERSAL,
+                                                        false,
+                                                        false)))));
+        Mockito.when(storageUtil.getFiles(Mockito.anyCollection(), Mockito.any(String[].class)))
+                .thenReturn(java.util.Map.of(42L, java.util.List.of()));
+        var remote = new ExtensionJson();
+        remote.setVersion("4.0.0");
+        Mockito.when(upstream.isValid()).thenReturn(true);
+        Mockito.when(upstream.getExtension("foobar", "baz", null)).thenReturn(remote);
+
+        mockMvc.perform(get("/user/extension/{namespace}/{extension}", "foobar", "baz").with(user("test_user")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(historical.getVersion()))
+                .andExpect(jsonPath("$.publishedLatestVersion").value("4.0.0"))
+                .andExpect(jsonPath("$.allTargetPlatformVersions[0].canDelete").value(true));
     }
 
     @Test

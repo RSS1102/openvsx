@@ -52,7 +52,7 @@ function renderDetail(
         getExtensionIcon: vi.fn().mockResolvedValue(null),
         getTrustedPublishingStatus: vi.fn().mockResolvedValue({ enabled: false, allowed: false })
     } as unknown as ExtensionRegistryService;
-    renderWithProviders(
+    return renderWithProviders(
         <ExtensionDetailView
             extension={extension(versions, overrides.extension)}
             onRemoveVersion={vi.fn().mockResolvedValue(undefined)}
@@ -148,8 +148,7 @@ describe('ExtensionDetailView', () => {
             { extension: { version: '2.0.0', publishedLatestVersion: '1.0.0' } }
         );
 
-        expect(screen.getByText('Latest')).toBeInTheDocument();
-        expect(screen.getAllByText('1.0.0')).toHaveLength(2);
+        expect(screen.getByText((_, element) => element?.textContent === '1.0.0Latest')).toBeInTheDocument();
         expect(screen.getByLabelText('Delete version 2.0.0')).toBeDisabled();
     });
 
@@ -158,6 +157,41 @@ describe('ExtensionDetailView', () => {
 
         expect(screen.queryByText('Latest')).not.toBeInTheDocument();
         expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    });
+
+    it('shows the upstream latest without marking an inactive local row', () => {
+        renderDetail(
+            [
+                version({
+                    version: '2.0.0',
+                    targetPlatforms: [{ targetPlatform: 'universal', active: false, removed: false }]
+                })
+            ],
+            undefined,
+            { extension: { version: '2.0.0', publishedLatestVersion: '2.0.0' } }
+        );
+        expect(screen.getByText(/upstream/)).toBeInTheDocument();
+        expect(screen.queryByText('Latest')).not.toBeInTheDocument();
+    });
+
+    it('updates the latest marker when refreshed data activates a local version', () => {
+        const inactive = version({
+            version: '2.0.0',
+            targetPlatforms: [{ targetPlatform: 'universal', active: false, removed: false }]
+        });
+        const view = renderDetail([inactive], undefined, { extension: { publishedLatestVersion: '3.0.0' } });
+        expect(screen.getByText(/upstream/)).toBeInTheDocument();
+        expect(screen.queryByText('Latest')).not.toBeInTheDocument();
+
+        view.rerender(
+            <ExtensionDetailView
+                extension={extension([version({ version: '2.0.0' })], { publishedLatestVersion: '2.0.0' })}
+                onRemoveVersion={vi.fn().mockResolvedValue(undefined)}
+                onVersionDeleted={vi.fn()}
+            />
+        );
+        expect(screen.queryByText(/upstream/)).not.toBeInTheDocument();
+        expect(screen.getByText('Latest')).toBeInTheDocument();
     });
 
     describe('namespace ownership conflict', () => {

@@ -87,6 +87,9 @@ export const ExtensionDetailView: FunctionComponent<ExtensionDetailViewProps> = 
     // "Latest" describes what the registry actually serves, so an extension the registry is holding
     // back — inactive, or removed — has no latest version to mark.
     const publishedLatest = extension.publishedLatestVersion;
+    const localLatest = allVersions.find(
+        v => v.version === publishedLatest && v.targetPlatforms.some(tp => tp.active && !tp.removed)
+    );
 
     return (
         <Box>
@@ -112,6 +115,7 @@ export const ExtensionDetailView: FunctionComponent<ExtensionDetailViewProps> = 
                 </DetailRow>
                 <DetailRow label='Latest version' mono noWrap>
                     {publishedLatest ?? '—'}
+                    {publishedLatest && !localLatest ? ' (upstream)' : ''}
                 </DetailRow>
                 <DetailRow label='Category' noWrap>
                     {extension.categories?.join(', ') || '—'}
@@ -150,7 +154,7 @@ export const ExtensionDetailView: FunctionComponent<ExtensionDetailViewProps> = 
             </Box>
             <ExtensionVersionTable
                 versions={allVersions}
-                latestVersion={publishedLatest}
+                latestVersion={localLatest?.version}
                 rejected={extension.reviewStatus === 'rejected'}
                 page={page}
                 onPageChange={setPage}
