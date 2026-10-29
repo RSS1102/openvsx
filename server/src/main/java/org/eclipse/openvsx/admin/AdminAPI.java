@@ -714,6 +714,10 @@ public class AdminAPI {
                 json.setDeprecated(extension.isDeprecated());
                 json.setActive(extension.isActive());
             }
+            var publishedLatest = repositories.findExtensionVersion(namespaceName, extensionName, null, "latest");
+            if (publishedLatest != null) {
+                json.setPublishedLatestVersion(publishedLatest.getVersion());
+            }
             return ResponseEntity.ok(json);
         } catch (ErrorResultException exc) {
             return exc.toResponseEntity(ExtensionJson.class);

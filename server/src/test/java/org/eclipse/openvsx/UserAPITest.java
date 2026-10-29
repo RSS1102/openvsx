@@ -596,6 +596,46 @@ class UserAPITest {
     }
 
     @Test
+    void testGetOwnExtensionUsesPublicLatestWithoutLosingHistoricalVersions() throws Exception {
+        var userData = mockUserData();
+        var versions = mockExtension(userData, 2, 0, 0);
+        var historical = versions.getLast();
+        historical.setId(42L);
+        var published = versions.getFirst();
+        Mockito.when(repositories.isNamespaceOwner(any(UserData.class), any(Namespace.class))).thenReturn(true);
+        Mockito.when(repositories.findLatestVersion(eq("foobar"), eq("baz"), any(), eq(false), eq(false)))
+                .thenReturn(historical);
+        Mockito.when(repositories.findExtensionVersion("foobar", "baz", null, "latest")).thenReturn(published);
+        Mockito.when(repositories.findTargetPlatformsGroupedByVersion(historical.getExtension())).thenReturn(List.of());
+        Mockito.when(storageUtil.getFiles(Mockito.anyCollection(), Mockito.any(String[].class)))
+                .thenReturn(java.util.Map.of(42L, java.util.List.of()));
+
+        mockMvc.perform(get("/user/extension/{namespace}/{extension}", "foobar", "baz").with(user("test_user")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(historical.getVersion()))
+                .andExpect(jsonPath("$.publishedLatestVersion").value(published.getVersion()))
+                .andExpect(jsonPath("$.allTargetPlatformVersions").isArray());
+    }
+
+    @Test
+    void testGetOwnExtensionWithoutPublicVersionRetainsHistory() throws Exception {
+        var userData = mockUserData();
+        var historical = mockExtension(userData, 1, 0, 0).getFirst();
+        historical.setId(42L);
+        Mockito.when(repositories.isNamespaceOwner(any(UserData.class), any(Namespace.class))).thenReturn(true);
+        Mockito.when(repositories.findLatestVersion(eq("foobar"), eq("baz"), any(), eq(false), eq(false)))
+                .thenReturn(historical);
+        Mockito.when(repositories.findTargetPlatformsGroupedByVersion(historical.getExtension())).thenReturn(List.of());
+        Mockito.when(storageUtil.getFiles(Mockito.anyCollection(), Mockito.any(String[].class)))
+                .thenReturn(java.util.Map.of(42L, java.util.List.of()));
+
+        mockMvc.perform(get("/user/extension/{namespace}/{extension}", "foobar", "baz").with(user("test_user")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publishedLatestVersion").doesNotExist())
+                .andExpect(jsonPath("$.allTargetPlatformVersions").isArray());
+    }
+
+    @Test
     void testGetOwnExtensionAsNamespaceMember() throws Exception {
         var userData = mockUserData();
         var versions = mockExtension(userData, 2, 0, 0);

@@ -503,6 +503,10 @@ public class UserAPI {
                 var error = "Extension not found: " + NamingUtil.toExtensionId(namespaceName, extensionName);
                 throw new ErrorResultException(error, HttpStatus.NOT_FOUND);
             }
+            var publishedLatest = repositories.findExtensionVersion(namespaceName, extensionName, null, "latest");
+            if (publishedLatest != null) {
+                json.setPublishedLatestVersion(publishedLatest.getVersion());
+            }
             return ResponseEntity.ok(json);
         } catch (ErrorResultException exc) {
             return exc.toResponseEntity(ExtensionJson.class);

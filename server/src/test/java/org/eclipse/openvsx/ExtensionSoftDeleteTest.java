@@ -276,6 +276,44 @@ class ExtensionSoftDeleteTest extends AbstractPostgresContainerTest {
                 .doesNotContain("2.0.0");
     }
 
+    @Test
+    void publicLatestTracksVersionActivationAndRemoval() {
+        persistVersion("1.0.0", TargetPlatform.NAME_UNIVERSAL, true, false);
+        persistVersion("2.0.0", TargetPlatform.NAME_LINUX_X64, false, false);
+        persistVersion("3.0.0", TargetPlatform.NAME_UNIVERSAL, false, true);
+
+        assertThat(repositories.findExtensionVersion(NAMESPACE, EXTENSION, null, "latest").getVersion())
+                .isEqualTo("1.0.0");
+        setVersionActive("2.0.0", true);
+        assertThat(repositories.findExtensionVersion(NAMESPACE, EXTENSION, null, "latest").getVersion())
+                .isEqualTo("2.0.0");
+        assertThat(
+                repositories.findExtensionVersion(
+                        NAMESPACE,
+                        EXTENSION,
+                        TargetPlatform.NAME_UNIVERSAL,
+                        "latest").getVersion())
+                .isEqualTo("1.0.0");
+        setVersionActive("2.0.0", false);
+        assertThat(repositories.findExtensionVersion(NAMESPACE, EXTENSION, null, "latest").getVersion())
+                .isEqualTo("1.0.0");
+        setVersionActive("1.0.0", false);
+        assertThat(repositories.findExtensionVersion(NAMESPACE, EXTENSION, null, "latest")).isNull();
+        setVersionActive("1.0.0", true);
+        assertThat(repositories.findExtensionVersion(NAMESPACE, EXTENSION, null, "latest").getVersion())
+                .isEqualTo("1.0.0");
+    }
+
+    private void setVersionActive(String version, boolean active) {
+        new TransactionTemplate(txManager).executeWithoutResult(status -> {
+            var found = em.createQuery(
+                    "select ev from ExtensionVersion ev where ev.extension.id = :id and ev.version = :version",
+                    ExtensionVersion.class).setParameter("id", extensionId).setParameter("version", version)
+                    .getSingleResult();
+            found.setActive(active);
+        });
+    }
+
     /**
      * Fix #3: the download URL map must never surface tombstones (whose files are gone anyway).
      */
